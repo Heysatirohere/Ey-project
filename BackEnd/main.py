@@ -3,8 +3,12 @@ import requests
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 
-API_KEY = "AIzaSyD6FyfbYgr2IxVNec2RCx7DmJX5AMPm_Os"
+load_dotenv
+
+
+API_KEY = "GEMINI_API_KEY"  # Substitua pela sua chave de API do Gemini
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={API_KEY}"
 
 app = FastAPI()
