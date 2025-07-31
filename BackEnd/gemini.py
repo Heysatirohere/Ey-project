@@ -43,6 +43,7 @@ def analisar_com_gemini(prompt: str):
     data = response.json()
     try:
         texto_ia = data["candidates"][0]["content"]["parts"][0]["text"]
+        print(f"Resposta da IA:", texto_ia)
     except (KeyError, IndexError):
         raise Exception("Resposta da API em formato inesperado")
 
