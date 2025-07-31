@@ -1,5 +1,6 @@
 import os
 import fitz 
+import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,20 +17,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 class ReportRequest(BaseModel):
     report: str
-    norm: str = None  
-
-
 
 @app.post("/analisar")
 def analisar_relatorio(request: ReportRequest):
     try:
-        # Se nenhuma norma for enviada, usa as carregadas da pasta
-        norm_text = request.norm or "\n\n".join(normas_padrao)
-        prompt = gerar_prompt(request.report, norm_text)
+        prompt = gerar_prompt(request.report)
         registros = analisar_com_gemini(prompt)
         return {"registros": registros}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+def carregar_planilha(path="dados/esg_base.xlsx"):
+    try: 
+        df = pd.read_excel(path)
+        return df.to_dict(orient="records")
+    except Exception as e:
+        return None

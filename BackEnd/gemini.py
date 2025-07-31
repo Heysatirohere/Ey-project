@@ -10,13 +10,11 @@ if not API_KEY:
 
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={API_KEY}"
 
-def gerar_prompt(report: str, norm: str = None) -> str:
+def gerar_prompt(report: str) -> str:
     return f"""
 Leia atentamente o seguinte relatório de uma empresa:
 
 {report}
-
-Compare com as normas da área de GRC (Governança, Riscos e Compliance){f' e com a norma abaixo:\n{norm}' if norm else ''}.
 
 Aponte todos os erros, falhas ou pontos críticos do relatório, e gere uma lista estruturada com os seguintes campos por item:
 
@@ -41,11 +39,14 @@ def analisar_com_gemini(prompt: str):
         raise Exception(f"Erro da API Gemini (status): {response.status_code}\nResposta: {response.text}")
 
     data = response.json()
+
     try:
         texto_ia = data["candidates"][0]["content"]["parts"][0]["text"]
-        print(f"Resposta da IA:", texto_ia)
+        print("\n🔍 Resposta da IA:\n" + "="*40)
+        print(texto_ia)
+        print("="*40 + "\n")
     except (KeyError, IndexError):
-        raise Exception("Resposta da API em formato inesperado")
+        raise Exception("Resposta da API em formato inesperado:\n" + str(data))
 
     registros = []
     for linha in texto_ia.strip().split('\n'):
