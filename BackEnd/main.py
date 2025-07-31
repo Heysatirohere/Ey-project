@@ -1,5 +1,5 @@
 import os
-import fitz  # PyMuPDF
+import fitz 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,20 +22,6 @@ class ReportRequest(BaseModel):
     norm: str = None  
 
 
-def carregar_normas_diretorio(diretorio: str):
-    normas = []
-    for nome_arquivo in os.listdir(diretorio):
-        if nome_arquivo.lower().endswith(".pdf"):
-            caminho = os.path.join(diretorio, nome_arquivo)
-            with fitz.open(caminho) as doc:
-                texto = ""
-                for pagina in doc:
-                    texto += pagina.get_text()
-                normas.append(texto)
-    return normas
-
-
-normas_padrao = carregar_normas_diretorio("normas")
 
 @app.post("/analisar")
 def analisar_relatorio(request: ReportRequest):
