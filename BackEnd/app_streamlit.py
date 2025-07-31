@@ -1,12 +1,10 @@
 import streamlit as st
-import fitz  # PyMuPDF
+import fitz
 import requests
 
-st.title("Análise de Relatórios GRC com Gemini")
+st.title("Análise de Relatórios GRC com Normas")
 
-# Upload do PDF
-uploaded_file = st.file_uploader("Faça upload do relatório em PDF", type="pdf")
-norm = st.text_area("Cole aqui normas ou diretrizes relevantes (opcional)", height=200)
+uploaded_file = st.file_uploader("Envie o relatório para análise", type="pdf")
 
 def extrair_texto_pdf(file):
     try:
@@ -21,24 +19,26 @@ def extrair_texto_pdf(file):
 
 if st.button("Analisar"):
     if not uploaded_file:
-        st.warning("Por favor, envie um PDF.")
+        st.warning("Envie um relatório PDF para análise.")
     else:
         report_text = extrair_texto_pdf(uploaded_file)
 
-        if not report_text:
-            st.warning("Não foi possível extrair texto do PDF.")
-        else:
-            with st.spinner("Enviando para análise..."):
-                try:
-                    response = requests.post(
-                        "http://localhost:8000/analisar",  # ajuste se precisar
-                        json={"report": report_text, "norm": norm}
-                    )
-                    if response.status_code == 200:
-                        resultado = response.json().get("resultado", "")
-                        st.subheader("Resultado da Análise:")
-                        st.write(resultado)
-                    else:
-                        st.error(f"Erro: {response.status_code}\n{response.text}")
-                except Exception as e:
-                    st.error(f"Falha na requisição: {e}")
+        with st.spinner("Analisando..."):
+            try:
+                response = requests.post(
+                    "http://localhost:8000/analisar",
+                    json={"report": report_text}
+                )
+                if response.status_code == 200:
+                    resultado = response.json().get("registros", [])
+                    st.subheader("Resultado da Análise:")
+
+                    for item in resultado:
+                        st.markdown(f"### 🔍 {item['titulo']}")
+                        st.markdown(f"**Grau de Risco:** {item['risco']}")
+                        st.markdown(f"**Explicação:** {item['descricao']}")
+                        st.markdown("---")
+                else:
+                    st.error(f"Erro: {response.status_code} - {response.text}")
+            except Exception as e:
+                st.error(f"Erro ao se comunicar com o servidor: {e}")
