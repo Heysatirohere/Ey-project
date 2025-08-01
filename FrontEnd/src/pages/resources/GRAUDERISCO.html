@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>ESG Analyzer</title>
+        <meta charset="UTF-8">
+    </head>
+    <body style="margin: 0;">
+        <div style="font-size: 30px;display: flex; align-items: center; justify-content: center;">
+                Classificações de Risco Detectadas nos Relatórios
+            </div>
+        <div style="font-size: 15px;color: gray;display: flex; align-items: center; justify-content: center; text-align: center;">
+             Aqui você encontra a visualização de uma série de dados sobre a classificação quanto ao risco dos problemas identificados nos relatórios que recebemos.
+        </div>
+        <div  style="height: 80px; display: flex; align-items: center; justify-content: center;">
+            <div style="height: 100%; 
+            width: 14%; 
+            background-color: red; 
+            border-radius: 10%; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            margin: 5px;"
+            title="Danos irreversíveis à natureza.">
+                <div style="font-size: 200%;font-weight: bold;">{{riscoAlto}}</div>
+                <div>Alto Risco</div>
+            </div>
+            <div style="height: 100%; 
+            width: 14%; 
+            background-color: rgb(255, 136, 0); 
+            border-radius: 10%; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center;
+            margin: 5px;"
+            title="Danos reversíveis à natureza.">
+                <div style="font-size: 200%;font-weight: bold;">{{riscoMedio}}</div>
+                <div>Médio Risco</div>
+            </div>
+            <div style="height: 100%; 
+            width: 14%; 
+            background-color: green; 
+            border-radius: 10%; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center;
+            margin: 5px;"
+            title="Incoerências comuns.">
+                <div style="font-size: 200%;font-weight: bold;">{{riscoBaixo}}</div>
+                <div>Baixo Risco</div>
+            </div>
+        </div>
+        <hr>
+    </body>
+</html>
