@@ -8,6 +8,7 @@ from collections import Counter
 from PIL import Image
 import google.generativeai as genai
 import os
+from datetime import date
 
 
 # Dados
@@ -109,6 +110,9 @@ explicacoes = {
         "Seções 3.1 e 6.8 apontam vazamentos contínuos de óleo e solventes próximos ao solo exposto. Viola a Resolução CONAMA nº 420/2009."
 }
 
+respostas = {
+    
+}
 
 # Função para gerar datas
 def gerar_datas():
@@ -258,6 +262,7 @@ df_gantt = pd.concat([
     pd.DataFrame({
         "Título": df["Título"],
         "Encarregado": df["Encarregado"],
+        "Relatório": df["Relatório"],
         "Início": df["Data de Início Prevista"],
         "Fim": df["Data de Finalização Prevista"],
         "Tipo": "Previsão",
@@ -266,6 +271,7 @@ df_gantt = pd.concat([
     pd.DataFrame({
         "Título": df["Título"],
         "Encarregado": df["Encarregado"],
+        "Relatório": df["Relatório"],
         "Início": df["Data de Início"],
         "Fim": df["Data de Finalização"],
         "Tipo": "Execução Real",
@@ -276,23 +282,76 @@ df_gantt = pd.concat([
 # Remove tarefas incompletas (sem início ou fim)
 df_gantt = df_gantt.dropna(subset=["Início", "Fim"])
 
-# Gantt com barras separadas por tipo
+
+if "graus_selecionados" not in st.session_state:
+    st.session_state.graus_selecionados = df_gantt["Grau de Risco"].unique().tolist()
+
+if "encarregados_selecionados" not in st.session_state:
+    st.session_state.encarregados_selecionados = df_gantt["Encarregado"].unique().tolist()
+
+if "tipo_selecionado" not in st.session_state:
+    st.session_state.tipo_selecionado = df_gantt["Tipo"].unique().tolist()
+
+if "relatorio_selecionado" not in st.session_state:
+    st.session_state.relatorio_selecionado = df_gantt["Relatório"].unique().tolist()
+
+df_filtrado = df_gantt.copy()
+
+# Widgets com chave (key) associada
+graus_selecionados = st.multiselect(
+    "Filtrar por Grau de Risco",
+    options=df_gantt["Grau de Risco"].unique(),
+    default=st.session_state.graus_selecionados,
+    key="graus_selecionados"
+)
+
+encarregados_selecionados = st.multiselect(
+    "Filtrar por Encarregado",
+    options=df_gantt["Encarregado"].unique(),
+    default=st.session_state.encarregados_selecionados,
+    key="encarregados_selecionados"
+)
+
+tipo_selecionado = st.multiselect(
+    "Filtrar por Tipo",
+    options=df_gantt["Tipo"].unique(),
+    default=st.session_state.tipo_selecionado,
+    key="tipo_selecionado"
+)
+
+relatorio_selecionado = st.multiselect(
+    "Filtrar por Relatório",
+    options=df_gantt["Relatório"].unique(),
+    default=st.session_state.relatorio_selecionado,
+    key="relatorio_selecionado"
+)
+
+if "data_inicio" not in st.session_state:
+    st.session_state.data_inicio = df_gantt["Início"].min().date()
+
+if "data_fim" not in st.session_state:
+    st.session_state.data_fim = df_gantt["Fim"].max().date()
+
+data_inicio = st.date_input("Data mínima", st.session_state.data_inicio, key="data_inicio")
+data_fim = st.date_input("Data máxima", st.session_state.data_fim, key="data_fim")
+
+
+df_filtrado = df_filtrado[
+    (df_filtrado["Início"].dt.date >= data_inicio) &
+    (df_filtrado["Fim"].dt.date <= data_fim)
+]
+
 figa = px.timeline(
-    df_gantt,
+    df_filtrado,
     x_start="Início",
     x_end="Fim",
     y="Título",
     color="Tipo",
-    title="Linha do Tempo: Previsão vs Execução",
-    hover_data=["Grau de Risco"],
-    color_discrete_map={
-        "Previsão": "yellow",
-        "Execução Real": "blue"
-    }
-
+    hover_data=["Grau de Risco", "Encarregado", "Relatório"],
+    color_discrete_map={"Previsão": "yellow", "Execução Real": "blue"}
 )
-
 figa.update_yaxes(autorange="reversed")
+
 
 st.plotly_chart(figa, use_container_width=True)
 
@@ -300,9 +359,48 @@ st.dataframe(df)
 
 opcao = st.selectbox("Selecione um título", df["Título"])
 
+encarregado = st.text_input("Nome do Encarregado:")
+
+# 3. Data de início (default: hoje)
+data_inicio = st.date_input("Data de Início:", value=date.today())
+
+# 4. Data de término
+index = df[df["Título"] == opcao].index
+        
+if not index.empty:
+    dataFinal = pd.to_datetime(df.at[index[0], "Data de Finalização"])
+    
+data_termino = st.date_input("Data de Término:", value= dataFinal)
+
+# 5. Área de texto para resposta
+resposta = st.text_area("Resposta ao problema:")
+
+if st.button("Salvar resposta"):
+    if not encarregado or not resposta:
+        st.warning("Preencha todos os campos obrigatórios.")
+    else:
+        # Atualiza o registro correspondente no DataFrame
+        index = df[df["Título"] == opcao].index
+        
+        if not index.empty:
+            df.at[index[0], "Encarregado"] = encarregado
+            df.at[index[0], "Data de Início"] = pd.to_datetime(data_inicio)
+            df.at[index[0], "Data de Finalização"] = pd.to_datetime(data_termino)
+            respostas[opcao] = resposta
+            
+            st.success(f"Resposta ao problema '{opcao}' registrada com sucesso!")
+        else:
+            st.error("Título selecionado não encontrado.")
 
 
-if(opcao):
+if(opcao): 
+    st.title("Explicação do Problema")
+    st.write(explicacoes[opcao])
+    if respostas.get(opcao):
+        st.title("Solução")
+        st.write(respostas[opcao])
+    else:
+        st.info("Nenhuma solução registrada ainda para este problema.")
     # Configure sua API key
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"] if "GEMINI_API_KEY" in st.secrets else os.getenv("GEMINI_API_KEY"))
     with st.expander("💬 Abrir Chat com a IA"):
