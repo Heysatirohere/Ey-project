@@ -1,5 +1,3 @@
-import os
-import fitz 
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -35,3 +33,4 @@ def carregar_planilha(path="dados/esg_base.xlsx"):
         return df.to_dict(orient="records")
     except Exception as e:
         return None
+    

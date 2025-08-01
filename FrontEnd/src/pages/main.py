@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-
 import plotly.express as px
 from random import choice, randint
 from datetime import datetime, timedelta
@@ -9,6 +8,15 @@ from PIL import Image
 import google.generativeai as genai
 import os
 from datetime import date
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+models = genai.list_models()
+
+for model in models:
+    print(model.name)
 
 
 # Dados
@@ -168,7 +176,7 @@ for item in dados:
         emProcesso += 1
 
 
-with open("resources\GRAUDERISCO.html", "r", encoding="utf-8") as f:
+with open("resources/GRAUDERISCO.html", "r", encoding="utf-8") as f:
     html_content = f.read()
 
 html_content = html_content.replace("{{riscoAlto}}", str(riscoAlto))
@@ -218,7 +226,7 @@ fig = px.bar(
 
 st.plotly_chart(fig)
 
-with open("resources\RESOLUCAO.html", "r", encoding="utf-8") as f:
+with open("resources/RESOLUCAO.html", "r", encoding="utf-8") as f:
     html_content2 = f.read()
 
 html_content2 = html_content2.replace("{{ocioso}}", str(ocioso))
@@ -305,10 +313,15 @@ graus_selecionados = st.multiselect(
     key="graus_selecionados"
 )
 
+opcoes_encarregados = sorted([e for e in df_gantt["Encarregado"].unique() if e and e.strip()])
+
+# Valida default para conter só opções válidas
+default_encarregados = [nome for nome in st.session_state.encarregados_selecionados if nome in opcoes_encarregados]
+
 encarregados_selecionados = st.multiselect(
     "Filtrar por Encarregado",
-    options=df_gantt["Encarregado"].unique(),
-    default=st.session_state.encarregados_selecionados,
+    options=opcoes_encarregados,
+    default=default_encarregados,
     key="encarregados_selecionados"
 )
 
@@ -373,56 +386,72 @@ if not index.empty:
 data_termino = st.date_input("Data de Término:", value= dataFinal)
 
 # 5. Área de texto para resposta
+if "respostas" not in st.session_state:
+    st.session_state["respostas"] = {}
+
 resposta = st.text_area("Resposta ao problema:")
 
 if st.button("Salvar resposta"):
     if not encarregado or not resposta:
         st.warning("Preencha todos os campos obrigatórios.")
     else:
-        # Atualiza o registro correspondente no DataFrame
         index = df[df["Título"] == opcao].index
-        
         if not index.empty:
             df.at[index[0], "Encarregado"] = encarregado
             df.at[index[0], "Data de Início"] = pd.to_datetime(data_inicio)
             df.at[index[0], "Data de Finalização"] = pd.to_datetime(data_termino)
-            respostas[opcao] = resposta
+            
+            # Atualiza respostas na sessão
+            st.session_state["respostas"][opcao] = resposta
             
             st.success(f"Resposta ao problema '{opcao}' registrada com sucesso!")
         else:
             st.error("Título selecionado não encontrado.")
 
+# Configura API fora dos ifs para garantir estar disponível
+genai.configure(
+    api_key=st.secrets["GEMINI_API_KEY"] if "GEMINI_API_KEY" in st.secrets else os.getenv("GEMINI_API_KEY")
+)
 
-if(opcao): 
-    st.title("Explicação do Problema")
-    st.write(explicacoes[opcao])
-    if respostas.get(opcao):
-        st.title("Solução")
-        st.write(respostas[opcao])
+if opcao:
+    if data_termino < data_inicio:
+        st.error("❌ A data de término não pode ser anterior à data de início.")
     else:
-        st.info("Nenhuma solução registrada ainda para este problema.")
-    # Configure sua API key
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"] if "GEMINI_API_KEY" in st.secrets else os.getenv("GEMINI_API_KEY"))
-    with st.expander("💬 Abrir Chat com a IA"):
+        st.title("Explicação do Problema")
+        st.write(explicacoes[opcao])
 
-        # Inicializa o modelo de chat
-        model = genai.GenerativeModel("models/gemini-pro")
+        if opcao in st.session_state["respostas"]:
+         with st.expander("💬 Abrir Chat com a IA"):
+            model = genai.GenerativeModel("models/gemini-2.5-pro")
+            contexto = st.session_state["respostas"].get(opcao, "")
 
+        # Inicializa o chat apenas se ainda não existir
         if "chat" not in st.session_state:
-            st.session_state.chat = model.start_chat(history=[])
+            history = []
+            if contexto:
+                history.append({
+                    "role": "user",
+                    "parts": [{"text": f"Contexto: {contexto}"}]
+                })
+            st.session_state.chat = model.start_chat(history=history)
 
-        # Título do app
         st.title("💬 Chat com GAIA")
-        
+
+        # Exibe histórico
         for msg in st.session_state.chat.history:
             with st.chat_message(msg.role):
                 st.markdown(msg.parts[0].text)
 
+        # Entrada do usuário
         prompt = st.chat_input("Digite sua mensagem...")
-
         if prompt:
             with st.chat_message("user"):
                 st.markdown(prompt)
-            # with st.chat_message("assistant"):
-                # response = st.session_state.chat.send_message(prompt)
-                # st.markdown(response.text)
+
+            response = st.session_state.chat.send_message(prompt)
+
+            with st.chat_message("assistant"):
+                st.markdown(response.text)
+else:
+    st.info("Nenhuma solução registrada ainda para este problema.")
+
