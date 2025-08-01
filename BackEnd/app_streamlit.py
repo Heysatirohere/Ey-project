@@ -1,92 +1,44 @@
 import streamlit as st
-import fitz  # PyMuPDF
+import fitz
 import requests
 
-# Configuração da página
-st.set_page_config(
-    page_title="Chat ESG - Análise GRC",
-    layout="centered",
-    page_icon="💬"
-)
+st.title("Análise de Relatórios GRC com Normas")
 
-# Título com estilo
-st.markdown("<h1 style='text-align: center;'>💬 Chat ESG</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: gray;'>Análise de Relatórios com OCPC-09, GRI, IFRS S1 e S2</p>", unsafe_allow_html=True)
-st.divider()
+uploaded_file = st.file_uploader("Envie o relatório para análise", type="pdf")
 
-# Histórico da conversa
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {
-            "role": "ai",
-            "content": "👋 Olá! Sou o assistente ESG. Envie um relatório em PDF ou me pergunte algo sobre GRI, OCPC-09, IFRS S1 e S2."
-        }
-    ]
-
-# Mostrar mensagens anteriores com estilo
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
-# Função para extrair texto do PDF
 def extrair_texto_pdf(file):
     try:
         with fitz.open(stream=file.read(), filetype="pdf") as doc:
-            texto = "".join([page.get_text() for page in doc])
+            texto = ""
+            for page in doc:
+                texto += page.get_text()
         return texto.strip()
     except Exception as e:
-        return f"Erro ao ler PDF: {e}"
+        st.error(f"Erro ao ler o PDF: {e}")
+        return ""
 
-# Bloco de upload
-with st.expander("📁 Enviar relatório em PDF para análise"):
-    uploaded_file = st.file_uploader("Selecione o arquivo PDF", type=["pdf"])
+if st.button("Analisar"):
+    if not uploaded_file:
+        st.warning("Envie um relatório PDF para análise.")
+    else:
+        report_text = extrair_texto_pdf(uploaded_file)
 
-# Campo de entrada de mensagem
-user_input = st.chat_input("Digite sua pergunta ou envie um PDF para análise...")
+        with st.spinner("Analisando..."):
+            try:
+                response = requests.post(
+                    "http://localhost:8000/analisar",
+                    json={"report": report_text}
+                )
+                if response.status_code == 200:
+                    resultado = response.json().get("registros", [])
+                    st.subheader("Resultado da Análise:")
 
-# Se o usuário enviou mensagem ou PDF
-if user_input or uploaded_file:
-
-    # PDF enviado
-    if uploaded_file:
-        user_msg = "📎 Enviado relatório para análise."
-        st.chat_message("user").markdown(user_msg)
-        st.session_state.messages.append({"role": "user", "content": user_msg})
-
-        with st.chat_message("ai"):
-            with st.spinner("🧠 Analisando seu relatório..."):
-                texto_pdf = extrair_texto_pdf(uploaded_file)
-
-                if not texto_pdf:
-                    resposta = "❌ Não consegui extrair o texto do PDF. Verifique se ele está legível."
+                    for item in resultado:
+                        st.markdown(f"### 🔍 {item['titulo']}")
+                        st.markdown(f"**Grau de Risco:** {item['risco']}")
+                        st.markdown(f"**Explicação:** {item['descricao']}")
+                        st.markdown("---")
                 else:
-                    try:
-                        response = requests.post("http://localhost:8000/analisar", json={"report": texto_pdf})
-                        if response.status_code == 200:
-                            registros = response.json().get("registros", [])
-                            if registros:
-                                resposta = "✅ **Análise do relatório:**\n\n"
-                                for item in registros:
-                                    resposta += f"""
-🔍 **{item['titulo']}**  
-- 🟠 Grau de Risco: **{item['risco']}**  
-- 📄 {item['descricao']}\n\n"""
-                            else:
-                                resposta = "✅ Nenhum risco relevante foi identificado no relatório enviado. 🎯"
-                        else:
-                            resposta = f"❌ Erro na API: {response.status_code} - {response.text}"
-                    except Exception as e:
-                        resposta = f"❌ Erro ao conectar com a API: {e}"
-
-            st.markdown(resposta)
-            st.session_state.messages.append({"role": "ai", "content": resposta})
-
-    # Entrada de texto (mensagem do usuário)
-    elif user_input:
-        st.chat_message("user").markdown(user_input)
-        st.session_state.messages.append({"role": "user", "content": user_input})
-
-        # Aqui é onde você integra com sua IA (por enquanto, resposta estática)
-        resposta = "🤖 No momento, só consigo analisar PDFs. Mas em breve poderei responder suas perguntas diretamente!"
-        st.chat_message("ai").markdown(resposta)
-        st.session_state.messages.append({"role": "ai", "content": resposta})
+                    st.error(f"Erro: {response.status_code} - {response.text}")
+            except Exception as e:
+                st.error(f"Erro ao se comunicar com o servidor: {e}")
